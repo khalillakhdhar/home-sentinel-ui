@@ -1,13 +1,34 @@
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Home, Eye, EyeOff } from "lucide-react";
+import { auth } from "@/lib/firebase";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      navigate("/dashboard");
+    } catch {
+      setError("Connexion impossible. Vérifiez votre email et mot de passe.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen">
@@ -54,16 +75,18 @@ export default function LoginPage() {
             <p className="mt-2 text-sm text-muted-foreground">Accédez à votre tableau de bord</p>
           </div>
 
-          <form
-            className="space-y-5"
-            onSubmit={(e) => {
-              e.preventDefault();
-              navigate("/dashboard");
-            }}
-          >
+          <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label htmlFor="email" className="text-foreground">Email</Label>
-              <Input id="email" type="email" placeholder="vous@exemple.com" defaultValue="ahmed@smarthome.com" className="h-11" />
+              <Input
+                id="email"
+                type="email"
+                placeholder="vous@exemple.com"
+                className="h-11"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+              />
             </div>
 
             <div className="space-y-2">
@@ -73,8 +96,10 @@ export default function LoginPage() {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
-                  defaultValue="password123"
                   className="h-11 pr-10"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
                 />
                 <button
                   type="button"
@@ -86,8 +111,18 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full h-11 gradient-primary text-primary-foreground font-semibold shadow-md hover:opacity-90 transition-opacity">
-              Se connecter
+            {error && (
+              <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+                {error}
+              </p>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full h-11 gradient-primary text-primary-foreground font-semibold shadow-md hover:opacity-90 transition-opacity"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Connexion..." : "Se connecter"}
             </Button>
           </form>
 
@@ -101,9 +136,9 @@ export default function LoginPage() {
           <Button
             variant="outline"
             className="w-full h-11"
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/signup")}
           >
-            Continuer comme invité
+            Créer un compte
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">

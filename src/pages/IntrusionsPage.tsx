@@ -1,21 +1,66 @@
-import { ShieldAlert, ShieldCheck, Shield, Clock, MapPin } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ShieldAlert, ShieldCheck, Shield, Clock, MapPin, AlertTriangle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/StatCard";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { fetchPresenceReading } from "@/lib/ubidots";
+import { TIME_RANGE_OPTIONS, TimeRange, filterByTimeRange, playAlertTone, useMonitoringPreferences } from "@/lib/monitoring";
 
-const intrusions = [
-  { id: 1, date: "07/04/2026", heure: "20:14", lieu: "Entrée principale", type: "Mouvement", statut: "Non résolu" },
-  { id: 2, date: "07/04/2026", heure: "16:45", lieu: "Fenêtre arrière", type: "Ouverture", statut: "Résolu" },
-  { id: 3, date: "06/04/2026", heure: "23:10", lieu: "Garage", type: "Mouvement", statut: "Résolu" },
-  { id: 4, date: "05/04/2026", heure: "03:22", lieu: "Jardin", type: "Mouvement", statut: "Résolu" },
-  { id: 5, date: "04/04/2026", heure: "14:55", lieu: "Porte latérale", type: "Ouverture", statut: "Résolu" },
-];
+function formatDate(timestamp: number) {
+  return new Date(timestamp).toLocaleDateString("fr-FR");
+}
 
-const isSecure = intrusions.filter(i => i.statut === "Non résolu").length === 0;
+function formatTime(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
 
 export default function IntrusionsPage() {
+  const [range, setRange] = useState<TimeRange>("1h");
+  const alertTriggeredRef = useRef(false);
+  const { alertSoundEnabled, setAlertSoundEnabled } = useMonitoringPreferences();
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["presence-live"],
+    queryFn: () => fetchPresenceReading(300),
+    refetchInterval: 10000,
+  });
+
+  const filteredHistory = filterByTimeRange(data?.history || [], range);
+  const detections = filteredHistory.filter((item) => item.value >= 1);
+  const currentPresence = data?.current?.value ?? 0;
+
+  useEffect(() => {
+    const shouldAlert = currentPresence >= 1;
+
+    if (alertSoundEnabled && shouldAlert && !alertTriggeredRef.current) {
+      playAlertTone();
+      alertTriggeredRef.current = true;
+      return;
+    }
+
+    if (!shouldAlert) {
+      alertTriggeredRef.current = false;
+    }
+  }, [alertSoundEnabled, currentPresence]);
+
+  const intrusions = detections
+    .slice()
+    .reverse()
+    .map((item, index) => ({
+      id: index + 1,
+      date: formatDate(item.timestamp),
+      heure: formatTime(item.timestamp),
+      lieu: "Capteur ultrason",
+      type: `Présence ${item.value}`,
+      statut: index === 0 && currentPresence >= 1 ? "Non résolu" : "Résolu",
+    }));
+
   const unresolvedCount = intrusions.filter(i => i.statut === "Non résolu").length;
+  const isSecure = unresolvedCount === 0;
+  const lastDetectionTime = intrusions[0]?.heure || "--:--";
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -23,6 +68,7 @@ export default function IntrusionsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Détection d'Intrusions</h1>
           <p className="text-muted-foreground mt-1">Historique et statut de sécurité</p>
+          {isError && <p className="mt-2 text-sm text-danger">Impossible de lire la présence ultrason depuis Ubidots.</p>}
         </div>
         <Badge
           variant="outline"
@@ -32,11 +78,40 @@ export default function IntrusionsPage() {
         </Badge>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        {TIME_RANGE_OPTIONS.map((option) => (
+          <Button
+            key={option.value}
+            size="sm"
+            variant={range === option.value ? "default" : "outline"}
+            onClick={() => setRange(option.value)}
+          >
+            {option.label}
+          </Button>
+        ))}
+        <Button
+          size="sm"
+          variant={alertSoundEnabled ? "default" : "outline"}
+          onClick={() => setAlertSoundEnabled(!alertSoundEnabled)}
+        >
+          Son alerte: {alertSoundEnabled ? "ON" : "OFF"}
+        </Button>
+      </div>
+
+      {currentPresence >= 1 && (
+        <Card className="border-danger/40 bg-danger/10">
+          <CardContent className="py-3 flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-danger animate-pulse" />
+            <p className="text-sm text-danger font-medium">Alerte présence active: ultrason = 1</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title="Total Intrusions" value={intrusions.length} subtitle="Ce mois" icon={Shield} variant="danger" />
+        <StatCard title="Total Détections" value={isLoading ? "..." : intrusions.length} subtitle={`Ultrason (${range})`} icon={Shield} variant="danger" />
         <StatCard title="Non Résolues" value={unresolvedCount} subtitle="Action requise" icon={ShieldAlert} variant="warning" />
-        <StatCard title="Dernière Intrusion" value="20:14" subtitle="Aujourd'hui" icon={Clock} variant="default" />
+        <StatCard title="Dernière Détection" value={isLoading ? "..." : lastDetectionTime} subtitle="Aujourd'hui" icon={Clock} variant="default" />
       </div>
 
       {/* Table */}
@@ -61,6 +136,13 @@ export default function IntrusionsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {intrusions.length === 0 && !isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      Aucune présence détectée (valeur 1)
+                    </TableCell>
+                  </TableRow>
+                )}
                 {intrusions.map((intr) => (
                   <TableRow key={intr.id} className="hover:bg-muted/50">
                     <TableCell className="font-medium text-muted-foreground">{intr.id}</TableCell>

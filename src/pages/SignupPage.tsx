@@ -1,13 +1,48 @@
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Home, Eye, EyeOff } from "lucide-react";
+import { auth } from "@/lib/firebase";
 
 export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
+
+    if (password.length < 6) {
+      setError("Le mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      const displayName = `${firstName} ${lastName}`.trim();
+
+      if (displayName) {
+        await updateProfile(credential.user, { displayName });
+      }
+
+      navigate("/dashboard");
+    } catch {
+      setError("Création du compte impossible. Vérifiez les informations saisies.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center p-8 bg-background">
@@ -24,21 +59,38 @@ export default function SignupPage() {
           <p className="mt-2 text-sm text-muted-foreground">Rejoignez SmartHome Monitoring</p>
         </div>
 
-        <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); navigate("/dashboard"); }}>
+        <form className="space-y-5" onSubmit={handleSubmit}>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label className="text-foreground">Prénom</Label>
-              <Input placeholder="Ahmed" className="h-11" />
+              <Input
+                placeholder="Ahmed"
+                className="h-11"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-foreground">Nom</Label>
-              <Input placeholder="Hammadi" className="h-11" />
+              <Input
+                placeholder="Hammadi"
+                className="h-11"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+              />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label className="text-foreground">Email</Label>
-            <Input type="email" placeholder="vous@exemple.com" className="h-11" />
+            <Input
+              type="email"
+              placeholder="vous@exemple.com"
+              className="h-11"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
           </div>
 
           <div className="space-y-2">
@@ -48,6 +100,9 @@ export default function SignupPage() {
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 className="h-11 pr-10"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
               />
               <button
                 type="button"
@@ -59,8 +114,18 @@ export default function SignupPage() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full h-11 gradient-primary text-primary-foreground font-semibold shadow-md hover:opacity-90 transition-opacity">
-            Créer mon compte
+          {error && (
+            <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
+          )}
+
+          <Button
+            type="submit"
+            className="w-full h-11 gradient-primary text-primary-foreground font-semibold shadow-md hover:opacity-90 transition-opacity"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Création..." : "Créer mon compte"}
           </Button>
         </form>
 
