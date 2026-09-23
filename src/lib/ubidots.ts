@@ -4,19 +4,19 @@ const ubidotsConfig = {
   presence: {
     datasourceId:
       import.meta.env.VITE_UBIDOTS_PRESENCE_DEVICE_ID ||
-      "69cce9af2209165866fd3634",
+      "6ab3f1ebc4a5e17a9561ecdc",
     token:
       import.meta.env.VITE_UBIDOTS_PRESENCE_TOKEN ||
-      "BBUS-CadFrfVfb369g7t4l3japOmD9eqjQo",
+      "BBUS-ja9aadqIaozN5L7nayeJxLICeccm1D",
     variableLabel:
       import.meta.env.VITE_UBIDOTS_PRESENCE_VARIABLE_LABEL || "ultrason",
   },
   gas: {
     datasourceId:
-      import.meta.env.VITE_UBIDOTS_GAS_DEVICE_ID || "69ccea1717c2a0991014d141",
+      import.meta.env.VITE_UBIDOTS_GAS_DEVICE_ID || "6ab3f4f17051752ffaf54d03",
     token:
       import.meta.env.VITE_UBIDOTS_GAS_TOKEN ||
-      "BBUS-9x5i3u0M4ixHP3ONF1ik91t2DmshB0",
+      "BBUS-ja9aadqIaozN5L7nayeJxLICeccm1D",
     variableLabel:
       import.meta.env.VITE_UBIDOTS_GAS_VARIABLE_LABEL || "capteur_gaz",
   },
